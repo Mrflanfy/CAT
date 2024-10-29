@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Halloween Rompecabezas Gatito</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pacifico&display=swap');
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            color: #F1C40F;
+            font-family: 'Pacifico', cursive;
+            animation: backgroundChange 10s infinite alternate;
+        }
+
+        @keyframes backgroundChange {
+            0% { background-color: rgb(10, 10, 20); }
+            25% { background-color: rgb(20, 20, 40); }
+            50% { background-color: rgb(30, 30, 60); }
+            75% { background-color: rgb(40, 40, 80); }
+            100% { background-color: rgb(50, 50, 100); }
+        }
+
+        #gameContainer {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        #puzzleBoard {
+            width: 300px;
+            height: 300px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 2px;
+            border: 5px solid #F1C40F;
+            background-color: #222;
+        }
+
+        #piecesContainer {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            width: 200px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .puzzlePiece, .piece {
+            width: 98px;
+            height: 98px;
+            background-size: 300px 300px; /* Ajustar al tamaño del rompecabezas */
+            cursor: pointer;
+            border: 2px solid #F1C40F;
+            transition: box-shadow 0.2s ease; /* Transición suave para el efecto de sombra */
+        }
+
+        .puzzlePiece {
+            background-color: #444;
+        }
+
+        .piece {
+            box-shadow: none; /* Sin sombra inicialmente */
+        }
+
+        .dragging {
+            box-shadow: 0 0 15px rgba(241, 196, 15, 0.7), 0 0 30px rgba(241, 196, 15, 0.5); /* Efecto de sombra al arrastrar */
+            opacity: 0.7; /* Opcional: hacer la pieza un poco transparente al arrastrar */
+            position: relative; /* Asegura que la sombra se mantenga en el lugar correcto */
+            z-index: 10; /* Asegura que la pieza arrastrada esté sobre las demás */
+        }
+
+        #message {
+            font-size: 2em;
+            color: #E74C3C;
+            text-shadow: 2px 2px 5px #000;
+            display: none;
+            margin-top: 20px;
+        }
+
+        #speaker {
+            cursor: pointer;
+            font-size: 2em;
+            margin-top: 20px;
+            color: #F1C40F;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="message">MINDREY, ERES HERMOSA!</h1>
+    <div id="gameContainer">
+        <div id="puzzleBoard"></div>
+        <div id="piecesContainer"></div>
+    </div>
+
+    <audio id="backgroundMusic" src="sound.mp3" preload="auto"></audio>
+
+    <div id="speaker" onclick="toggleMusic()">🔊</div>
+
+    <script>
+        const imageSrc = "gato.png";  // Asegúrate de que esta imagen esté en la misma carpeta
+        const numPieces = 9;           // 3x3 rompecabezas
+        const puzzleBoard = document.getElementById("puzzleBoard");
+        const piecesContainer = document.getElementById("piecesContainer");
+        const message = document.getElementById("message");
+        const backgroundMusic = document.getElementById("backgroundMusic");
+        let isMusicPlaying = false;
+        let draggedPiece = null; // Para almacenar la pieza que se está arrastrando
+
+        // Función para iniciar la música en bucle
+        function playMusic() {
+            backgroundMusic.loop = true;
+            backgroundMusic.play().catch(error => {
+                console.log("Autoplay failed. Please start the music manually.");
+            });
+            isMusicPlaying = true;
+            document.getElementById('speaker').innerHTML = '🔇'; // Cambiar el icono a silenciado
+        }
+
+        function pauseMusic() {
+            backgroundMusic.pause();
+            isMusicPlaying = false;
+            document.getElementById('speaker').innerHTML = '🔊'; // Cambiar el icono al parlante
+        }
+
+        function toggleMusic() {
+            if (isMusicPlaying) {
+                pauseMusic();
+            } else {
+                playMusic();
+            }
+        }
+
+        // Función para cargar el rompecabezas
+        function initializePuzzle() {
+            puzzleBoard.innerHTML = '';
+            piecesContainer.innerHTML = '';
+            message.style.display = 'none';
+
+            const positions = [...Array(numPieces).keys()];
+            const shuffledPositions = [...positions].sort(() => 0.5 - Math.random());
+
+            // Crear los espacios en el tablero
+            positions.forEach(position => {
+                const placeholder = document.createElement("div");
+                placeholder.classList.add("puzzlePiece");
+                placeholder.setAttribute("data-position", position);
+                puzzleBoard.appendChild(placeholder);
+            });
+
+            // Crear las piezas del rompecabezas en el contenedor de piezas
+            shuffledPositions.forEach(position => {
+                const piece = document.createElement("div");
+                piece.classList.add("piece");
+                piece.style.backgroundImage = `url(${imageSrc})`;
+                piece.style.backgroundPosition = `${(position % 3) * -100}px ${(Math.floor(position / 3)) * -100}px`; // Ajustar según el tamaño
+                piece.setAttribute("data-position", position);
+                piece.draggable = true;
+
+                piece.addEventListener("dragstart", dragStart);
+                piece.addEventListener("dragend", dragEnd);
+                piecesContainer.appendChild(piece);
+            });
+        }
+
+        function dragStart(e) {
+            draggedPiece = e.target; // Almacenar la pieza que se está arrastrando
+            if (e.dataTransfer) { // Asegurarse de que dataTransfer esté disponible
+                e.dataTransfer.setData("text/plain", draggedPiece.getAttribute("data-position"));
+                setTimeout(() => {
+                    draggedPiece.classList.add("dragging"); // Añadir clase de sombra
+                }, 0);
+            }
+        }
+
+        function dragEnd(e) {
+            if (draggedPiece) {
+                draggedPiece.classList.remove("dragging"); // Remover clase de sombra
+                draggedPiece.style.display = "block"; // Mostrar la pieza nuevamente
+                draggedPiece = null;
+            }
+        }
+
+        puzzleBoard.addEventListener("dragover", (e) => {
+            e.preventDefault(); // Necesario para permitir el "drop"
+        });
+
+        puzzleBoard.addEventListener("drop", (e) => {
+            e.preventDefault();
+            const position = e.dataTransfer.getData("text/plain");
+            const targetPiece = e.target;
+
+            if (targetPiece.classList.contains("puzzlePiece") && draggedPiece) {
+                // Si la posición de la pieza arrastrada coincide con la del objetivo
+                if (position == targetPiece.getAttribute("data-position")) {
+                    targetPiece.style.backgroundImage = draggedPiece.style.backgroundImage;
+                    targetPiece.style.backgroundPosition = draggedPiece.style.backgroundPosition;
+                    draggedPiece.remove(); // Eliminar la pieza arrastrada del contenedor
+                    checkCompletion();
+                }
+            }
+        });
+
+        // Manejo de eventos táctiles para móviles
+        piecesContainer.addEventListener("touchstart", function(e) {
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (target && target.classList.contains('piece')) {
+                draggedPiece = target; // Guardar la pieza arrastrada
+                dragStart({ target }); // Llamar a dragStart con el objeto correcto
+                draggedPiece.classList.add("dragging"); // Añadir clase de sombra
+            }
+        });
+
+        piecesContainer.addEventListener("touchend", function(e) {
+            const touch = e.changedTouches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (target && target.classList.contains('puzzlePiece')) {
+                const draggedPosition = draggedPiece.getAttribute("data-position");
+                if (draggedPosition == target.getAttribute("data-position")) {
+                    target.style.backgroundImage = draggedPiece.style.backgroundImage;
+                    target.style.backgroundPosition = draggedPiece.style.backgroundPosition;
+                    draggedPiece.remove(); // Eliminar la pieza arrastrada del contenedor
+                    checkCompletion();
+                }
+            }
+            dragEnd(); // Finalizar el arrastre
+        });
+
+        function checkCompletion() {
+            const placeholders = document.querySelectorAll(".puzzlePiece");
+            const completed = Array.from(placeholders).every((piece) => piece.style.backgroundImage !== "");
+
+            if (completed) {
+                message.style.display = 'block'; // Mostrar el mensaje de felicitación
+            }
+        }
+
+        // Iniciar el juego y la música
+        initializePuzzle();
+
+        // Reproducir música solo después de una interacción del usuario
+        window.addEventListener('click', playMusic);
+        window.addEventListener('touchstart', playMusic);
+    </script>
+</body>
+</html>
